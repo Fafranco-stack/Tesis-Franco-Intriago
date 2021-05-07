@@ -3,6 +3,8 @@
 #CondBag
 
 # *********************Simulaci?n de datos*******************************
+options(install.packages.compile.from.source = "always")
+install.packages(c("mice", "MASS", "party","tidyverse","rpart"), type = "both")
 
 library(mice)
 library(MASS)
