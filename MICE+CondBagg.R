@@ -3,13 +3,13 @@
 #Conditional Bagging
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","xlsx"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
 
 library(mice)
 library(MASS)
 library(party)
 library(tidyverse)
-library(xlsx)
+library(openxlsx)
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -143,8 +143,15 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     y_hat_inc=rowMeans(n1)
     mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) }}
 
-write.xlsx(mse_cor,"CondBagg+Mice", sheetName="Enfoque Correcto",append=FALSE)
-write.xlsx(mse_inc,"CondBagg+Mice", sheetName="Enfoque Incorrecto",append=TRUE)
+#Guardar datos en excel
+wb <- createWorkbook()
+addWorksheet(wb, "Enfoque Correcto")
+addWorksheet(wb, "Enfoque Incorrecto")
+
+writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
+writeData(wb, "Enfoque Incorrecto", mse_inc, startRow = 1, startCol = 1)
+
+saveWorkbook(wb, file = "CondBagg-MICE.xlsx", overwrite = TRUE)
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
