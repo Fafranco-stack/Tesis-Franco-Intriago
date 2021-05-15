@@ -4,11 +4,12 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
 
 library(mice)
 library(MASS)
 library(party)
+library(openxlsx)
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -95,10 +96,16 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     crforest.res=predict(crforest,newdata=test)
     mse_cor[r,contador_mse] =mean((crforest.res-test$y)^2) } } #media cuadr?tica del error
 
+#Guardar datos en excel
+wb <- createWorkbook()
+addWorksheet(wb, "Enfoque Correcto")
+
+writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
+
+saveWorkbook(wb, file = "CondRF-Surrogates.xlsx", overwrite = TRUE)
 
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
 
-#Hola :)
