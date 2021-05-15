@@ -4,11 +4,12 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
 
 library(mice)
 library(MASS)
 library(party)
+library(openxlsx)
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -73,7 +74,7 @@ contador_mse=0 #Contador
 start.time <- Sys.time()
 for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos faltantes
   contador_mse=contador_mse+1
-  for (r in 1:1){
+  for (r in 1:100){
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -91,11 +92,18 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     }
     
     
-    crforest=cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=training,controls = cforest_unbiased(ntree = 500, mtry = NULL, maxsurrogate = min(3, ncol(test)-1)))
+    crforest=cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=training,controls = cforest_unbiased(ntree = 500, mtry = (ncol(datos)-1), maxsurrogate = min(3, ncol(test)-1)))
     crforest.res=predict(crforest,newdata=test)
     mse_cor[r,contador_mse] =mean((crforest.res-test$y)^2) } } #media cuadr?tica del error
 
 
+#Guardar datos en excel
+wb <- createWorkbook()
+addWorksheet(wb, "Enfoque Correcto")
+
+writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
+
+saveWorkbook(wb, file = "CondBagg-Surrogates.xlsx", overwrite = TRUE)
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
