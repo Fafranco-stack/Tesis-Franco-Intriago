@@ -94,11 +94,13 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     crforest=cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=training,controls = cforest_unbiased(ntree = 500, mtry = min(5, ncol(test)-1), maxsurrogate = min(3, ncol(test)-1)))
     crforest.res=predict(crforest,newdata=test)
-    mse_cor[r,contador_mse] =mean((crforest.res-test$y)^2) } } #media cuadr?tica del error
+    mse_cor[r,contador_mse] =mean((crforest.res-test$y)^2)
     rm(crforest)
     rm(crforest.res)
     rm(training)
     rm(test)
+    } } #media cuadr?tica del error
+    
 #Guardar datos en excel
 wb <- createWorkbook()
 addWorksheet(wb, "Enfoque Correcto")
