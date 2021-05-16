@@ -4,7 +4,7 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","randomForest","openxlsx"))
 
 library(mice)
 library(MASS)
@@ -68,8 +68,8 @@ rm(yi)
 #Agregamos los datos faltantes
 #datos faltantes 10%, 20%, 30%, 40%
 
-mse_cor=matrix(ncol = 4,nrow=100) #Media cuadr·tica del error enfoque correcto
-mse_inc=matrix(ncol = 4,nrow=100) #Media cuadr·tica del error enfoque incorrecto
+mse_cor=matrix(ncol = 4,nrow=100) #Media cuadr√°tica del error enfoque correcto
+mse_inc=matrix(ncol = 4,nrow=100) #Media cuadr√°tica del error enfoque incorrecto
 contador_mse=0 #Contador
 
 start.time <- Sys.time()
