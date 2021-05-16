@@ -4,7 +4,7 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","randomForest","openxlsx"))
+install.packages(c("mice", "MASS", "party","tidyverse","randomForest","openxlsx"),type = "both")
 
 library(mice)
 library(MASS)
