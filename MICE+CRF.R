@@ -3,13 +3,24 @@
 #Conditional rf
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","openxlsx","foreach","doParallel"), type = "both")
 
 library(mice)
 library(MASS)
 library(party)
-library(tidyverse)
 library(openxlsx)
+library(foreach)
+library(doParallel)
+
+n.cores <- parallel::detectCores()-1
+my.cluster <- parallel::makeCluster(
+  n.cores, 
+  type = "PSOCK"
+)
+print(my.cluster)
+doParallel::registerDoParallel(cl = my.cluster)
+foreach::getDoParRegistered()
+foreach::getDoParWorkers()
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -95,53 +106,68 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     #********************Imputaci?n de datos faltantes bajo enfoque correcto y evaluaci?n de predicci?n Random Forest
     datos.ignore=rbind.data.frame(training,test) #union de los datos de prueba y entrenamiento en una variable
-    
+    rm(training)
     imp <- mice(datos.ignore, ignore =as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos)))),predictorMatrix = pred,m = 5, defaultMethod = c("norm", "logreg", "polyreg")) #con el par?metro ignore seleccionamos los datos que deben ser ignorados pero que deben imputarse
     rm(datos.ignore)
     
-    imp_test=filter(imp,as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos)))))
-    imp_entre=filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos)))))
-    
-    crf=imp_entre %>% complete("all") %>% lapply(cforest, formula = yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,controls = cforest_unbiased(ntree = 500, mtry = min(5, ncol(test)-1), maxsurrogate = min(3, ncol(test)-1)))
-      
+    imp_test=complete(filter(imp,as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos))))),"all")
+    imp_entre=complete(filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos))))),"all")
+    rm(imp)
+
+   
+  
+    modelos=foreach(ent=iter(imp_entre),.packages = c("cforest"))%dopar%{
+      m.i=cforest::cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=ent,controls = cforest_unbiased(ntree = 500, mtry =  min(5, ncol(test)-1), maxsurrogate = min(3, ncol(test)-1)))
+      return(m.i)
+    }
+    rm(imp_entre)
+
 
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=crf[[i]]
+      modelo=modelos[[i]]
       contador=0
-      crf.res=predict(modelo,newdata=complete(imp_test,i))
-      for (j in rf.res){
+      crf.res=predict(modelo,newdata=imp_test[[i]])
+      for (j in crf.res){
         contador=contador+1
         n1[contador,i]=j
       }
-      
-    }
+
+      }
+
+    rm(imp_test)
     
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
+    rm(n1)
     mse_cor[r,contador_mse] =mean((y_hat_cor-test$y)^2) #media cuadr?tica del error
     
     #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
-    imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
+    #imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
     imp_test=mice(test, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
     
-    crf=imp_entre %>% complete("all") %>% lapply(cforest, formula = yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,controls = cforest_unbiased(ntree = 500, mtry = min(5, ncol(test)-1), maxsurrogate = min(3, ncol(test)-1)))
+    
+  
     
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=crf[[i]]
+      modelo=modelos[[i]]
       contador=0
-      crf.res=predict(modelo,newdata=complete(imp_test,i))
-      for (j in rf.res){
+      crf.res=predict(modelo,newdata=imp_test[[i]])
+      for (j in crf.res){
         contador=contador+1
         n1[contador,i]=j
       }
-      
-    }
-    
-    y_hat_inc=rowMeans(n1)
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) }}
 
+    }
+    rm(imp_test)
+    rm(modelos)
+    y_hat_inc=rowMeans(n1)
+    rm(n1)
+  
+    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2)
+    }}
+parallel::stopCluster(cl=my.cluster)
 #Guardar datos en excel
 wb <- createWorkbook()
 addWorksheet(wb, "Enfoque Correcto")

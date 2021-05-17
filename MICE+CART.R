@@ -4,13 +4,27 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx","foreach","doParallel"), type = "both")
 
 
 library(mice)
 library(MASS)
 library(rpart)
 library(openxlsx)
+library(foreach)
+library(doParallel)
+library(tidyverse)
+
+n.cores <- parallel::detectCores() - 1
+my.cluster <- parallel::makeCluster(
+  n.cores,
+  type = "PSOCK"
+)
+print(my.cluster)
+doParallel::registerDoParallel(cl = my.cluster)
+foreach::getDoParRegistered()
+foreach::getDoParWorkers()
+
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -73,10 +87,12 @@ mse_cor=matrix(ncol = 4,nrow=100) #Media cuadr?tica del error enfoque correcto
 mse_inc=matrix(ncol = 4,nrow=100) #Media cuadr?tica del error enfoque incorrecto
 contador_mse=0 #Contador
 
+avance=0
 start.time <- Sys.time()
 for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos faltantes
   contador_mse=contador_mse+1
   for (r in 1:100){
+    avance=avance+1
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -95,51 +111,73 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     #********************Imputaci?n de datos faltantes bajo enfoque correcto y evaluaci?n de predicci?n Random Forest
     datos.ignore=rbind.data.frame(training,test) #union de los datos de prueba y entrenamiento en una variable
-    
     imp <- mice(datos.ignore, ignore =as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos)))),predictorMatrix = pred,m = 5, defaultMethod = c("norm", "logreg", "polyreg")) #con el par?metro ignore seleccionamos los datos que deben ser ignorados pero que deben imputarse
+    
     rm(datos.ignore)
     
-    imp_test=filter(imp,as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos)))))
-    imp_entre=filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos)))))
+    imp_test=complete(filter(imp,as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos))))),"all")
+    imp_entre=complete(filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos))))),"all")
+    rm(imp)
     
-    cart=with(imp_entre, rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1) ) ) #Aplicando cart
+    #cart=imp_entre %>% lapply(rpart,formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1) ) #Aplicando cart
     
+    
+    cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
+      m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1),data=entre )
+      return(m.i)
+    }
+
+    # n1=foreach(modelo=iter(cart),test=iter(imp_test),.packages = c("rpart"),.combine = "cbind")%dopar%{
+    #   res=predict(modelo,test)
+    #   return(res)
+    # }
+    rm(imp_entre)
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=cart[["analyses"]][[i]]
+      modelo=cart[[i]]
       contador=0
-      rf.res=predict(modelo,complete(imp_test,i))
+      rf.res=predict(modelo,imp_test[[i]])
       for (j in rf.res){
         contador=contador+1
         n1[contador,i]=j
       }
       
     }
-    
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
+    rm(n1)
     mse_cor[r,contador_mse] =mean((y_hat_cor-test$y)^2) #media cuadr?tica del error
-    
+    rm(y_hat_cor)
+    rm(imp_test)
+   
     #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
-    imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
-    imp_test=mice(test, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
+    #imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
+    imp_test=complete(mice(test, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred),"all")
     
-    cart=with(imp_entre, rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1) ) ) #Aplicando cart
-    
+    # n1=foreach(i=1:5,.packages = c("rpart","mice"),.combine = "cbind")%dopar%{
+    #   res=predict(modelos[[i]],complete(imp_test,i))
+    #   return(res)}
+      
+
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=cart[["analyses"]][[i]]
+      modelo=cart[[i]]
       contador=0
-      rf.res=predict(modelo,complete(imp_test,i))
+      rf.res=predict(modelo,imp_test[[i]])
       for (j in rf.res){
         contador=contador+1
         n1[contador,i]=j
       }
-      
+
     }
     
     y_hat_inc=rowMeans(n1)
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) }}
+    rm(n1)
+    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) 
+    rm(y_hat_inc)
+    print(paste(avance,"/400"))
+    }}
+parallel::stopCluster(cl = my.cluster)
 
 #Guardar en excel
 wb <- createWorkbook()
