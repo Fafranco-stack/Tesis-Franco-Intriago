@@ -154,6 +154,8 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     }}
 
 #Guardar datos en excel
+parallel::stopCluster(cl = my.cluster)
+
 wb <- createWorkbook()
 addWorksheet(wb, "Enfoque Correcto")
 addWorksheet(wb, "Enfoque Incorrecto")
