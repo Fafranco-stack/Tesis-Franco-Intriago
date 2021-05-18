@@ -104,8 +104,8 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     rm(imp)
   
     
-    modelos=foreach(ent=iter(imp_entre),.packages = c("cforest"))%dopar%{
-      m.i=cforest::cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=ent,controls = cforest_unbiased(ntree = 500, mtry = (ncol(datos)-1), maxsurrogate = min(3, ncol(test)-1)))
+    modelos=foreach(ent=iter(imp_entre),.packages = c("party"))%dopar%{
+      m.i=cforest::cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=ent,controls = cforest_unbiased(ntree = 500, mtry = (ncol(datos)-1), maxsurrogate = min(3, ncol(datos)-1)))
       return(m.i)
     }
     
@@ -152,6 +152,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     rm(n1)
     mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) 
     }}
+parallel::stopCluster(cl = my.cluster)
 
 #Guardar datos en excel
 parallel::stopCluster(cl = my.cluster)

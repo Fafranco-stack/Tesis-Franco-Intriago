@@ -116,8 +116,8 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
 
    
   
-    modelos=foreach(ent=iter(imp_entre),.packages = c("cforest"))%dopar%{
-      m.i=cforest::cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=ent,controls = cforest_unbiased(ntree = 500, mtry =  min(5, ncol(test)-1), maxsurrogate = min(3, ncol(test)-1)))
+    modelos=foreach(ent=iter(imp_entre),.packages = c("party"))%dopar%{
+      m.i=cforest::cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=ent,controls = cforest_unbiased(ntree = 500, mtry =  min(5, ncol(test)-1), maxsurrogate = min(3, ncol(datos)-1)))
       return(m.i)
     }
     rm(imp_entre)

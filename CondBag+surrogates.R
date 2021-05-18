@@ -4,12 +4,25 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx"), type = "both")
+install.packages(c("mice", "MASS", "party","tidyverse","openxlsx","doParallel","foreach"), type = "both")
 
 library(mice)
 library(MASS)
 library(party)
 library(openxlsx)
+library(doParallel)
+library(foreach)
+
+n.cores <- parallel::detectCores() - 1
+my.cluster <- parallel::makeCluster(
+  n.cores,
+  type = "PSOCK"
+)
+print(my.cluster)
+doParallel::registerDoParallel(cl = my.cluster)
+foreach::getDoParRegistered()
+foreach::getDoParWorkers()
+
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -68,13 +81,12 @@ rm(yi)
 #Agregamos los datos faltantes
 #datos faltantes 10%, 20%, 30%, 40%
 
-mse_cor=matrix(ncol = 4,nrow=100) #Media cuadr?tica del error enfoque correcto
 contador_mse=0 #Contador
-
+vec=rep(0,100)
 start.time <- Sys.time()
-for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos faltantes
-  contador_mse=contador_mse+1
-  for (r in 1:100){
+mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:%  #inicializamos con el porcentajo de datos faltantes
+  
+  foreach (r= 1:1,.packages = c("party"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -94,14 +106,20 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     crforest=cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=training,controls = cforest_unbiased(ntree = 500, mtry = (ncol(datos)-1), maxsurrogate = min(3, ncol(test)-1)))
     crforest.res=predict(crforest,newdata=test)
-    mse_cor[r,contador_mse] =mean((crforest.res-test$y)^2) } } #media cuadr?tica del error
+    mse =mean((crforest.res-test$y)^2)
+    vec[r]=mse
+     
+  return(vec)
+  } #media cuadr?tica del error
 
 
 #Guardar datos en excel
+parallel::stopCluster(cl = my.cluster)
+
 wb <- createWorkbook()
 addWorksheet(wb, "Enfoque Correcto")
 
-writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
+writeData(wb, "Enfoque Correcto", mse, startRow = 1, startCol = 1)
 
 saveWorkbook(wb, file = "CondBagg-Surrogates.xlsx", overwrite = TRUE)
 
