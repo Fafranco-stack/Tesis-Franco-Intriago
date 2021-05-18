@@ -94,7 +94,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
 
     cart=rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1),data=training )  #Aplicando cart
     cart.res=predict(cart,test)
-    mse_cor[r,contador_mse] =mean((cart.res-test$y)^2) } } #media cuadr?tica del error
+    mse_cor[r,contador_mse] =mean((cart.res-test$yi)^2) } } #media cuadr?tica del error
     
 #Guardar datos en excel
 wb <- createWorkbook()

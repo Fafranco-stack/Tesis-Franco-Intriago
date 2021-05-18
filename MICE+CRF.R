@@ -139,7 +139,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
     rm(n1)
-    mse_cor[r,contador_mse] =mean((y_hat_cor-test$y)^2) #media cuadr?tica del error
+    mse_cor[r,contador_mse] =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
     
     #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
@@ -165,7 +165,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     y_hat_inc=rowMeans(n1)
     rm(n1)
   
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2)
+    mse_inc[r,contador_mse] =mean((y_hat_inc-test$yi)^2)
     }}
 parallel::stopCluster(cl=my.cluster)
 #Guardar datos en excel

@@ -145,7 +145,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     }
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
     rm(n1)
-    mse_cor[r,contador_mse] =mean((y_hat_cor-test$y)^2) #media cuadr?tica del error
+    mse_cor[r,contador_mse] =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
     rm(y_hat_cor)
     rm(imp_test)
    
@@ -173,7 +173,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     y_hat_inc=rowMeans(n1)
     rm(n1)
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$y)^2) 
+    mse_inc[r,contador_mse] =mean((y_hat_inc-test$yi)^2) 
     rm(y_hat_inc)
     print(paste(avance,"/400"))
     }}
