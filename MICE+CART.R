@@ -123,7 +123,7 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     
     
     cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
-      m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1),data=entre )
+      m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control= rpart.control(maxsurrogate = min(3,ncol(training)-1)),data=entre )
       return(m.i)
     }
 
