@@ -88,7 +88,7 @@ mse_inc=matrix(ncol=4,nrow = 100)
 
 start.time <- Sys.time()
 mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos faltantes
-  foreach(r=c(1:5),.packages=c("mice","rpart","tidyverse"))%dopar%{
+  foreach(r=c(1:100),.packages=c("mice","rpart","tidyverse"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -115,7 +115,7 @@ mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos
     imp_entre=complete(filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos))))),"all")
     rm(imp)
     
-    cart=imp_entre %>% lapply(rpart,formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control=rpart.control(maxsurrogate = min(3,ncol(training)-1)) ) #Aplicando cart
+    cart=imp_entre %>% lapply(function(x){rpart(formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=x,control=rpart.control(maxsurrogate = min(3,ncol(training)-1)))}) #Aplicando cart
     
     
     # cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
