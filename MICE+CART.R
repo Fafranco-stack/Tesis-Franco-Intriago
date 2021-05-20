@@ -4,7 +4,7 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","tidyverse","rpart","openxlsx","foreach","doParallel"), type = "both")
+install.packages(c("mice", "MASS", "party","rpart","openxlsx","foreach","doParallel"), type = "both")
 
 
 library(mice)
@@ -15,7 +15,7 @@ library(foreach)
 library(doParallel)
 library(tidyverse)
 
-n.cores <- parallel::detectCores() - 1
+n.cores <- 4
 my.cluster <- parallel::makeCluster(
   n.cores,
   type = "PSOCK"
@@ -83,16 +83,12 @@ rm(yi)
 #Agregamos los datos faltantes
 #datos faltantes 10%, 20%, 30%, 40%
 
-mse_cor=matrix(ncol = 4,nrow=100) #Media cuadr?tica del error enfoque correcto
-mse_inc=matrix(ncol = 4,nrow=100) #Media cuadr?tica del error enfoque incorrecto
-contador_mse=0 #Contador
+mse_cor=matrix(ncol=4,nrow = 100)
+mse_inc=matrix(ncol=4,nrow = 100)
 
-avance=0
 start.time <- Sys.time()
-for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos faltantes
-  contador_mse=contador_mse+1
-  for (r in 1:100){
-    avance=avance+1
+mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos faltantes
+  foreach(r=c(1:5),.packages=c("mice","rpart","tidyverse"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -119,14 +115,14 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     imp_entre=complete(filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos))))),"all")
     rm(imp)
     
-    #cart=imp_entre %>% lapply(rpart,formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,maxsurrogate = min(3,ncol(training)-1) ) #Aplicando cart
+    cart=imp_entre %>% lapply(rpart,formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control=rpart.control(maxsurrogate = min(3,ncol(training)-1)) ) #Aplicando cart
     
     
-    cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
-      m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control= rpart.control(maxsurrogate = min(3,ncol(training)-1)),data=entre )
-      return(m.i)
-    }
-
+    # cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
+    #   m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control= rpart.control(maxsurrogate = min(3,ncol(training)-1)),data=entre )
+    #   return(m.i)
+    # }
+    # 
     # n1=foreach(modelo=iter(cart),test=iter(imp_test),.packages = c("rpart"),.combine = "cbind")%dopar%{
     #   res=predict(modelo,test)
     #   return(res)
@@ -145,19 +141,16 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
     }
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
     rm(n1)
-    mse_cor[r,contador_mse] =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
+    mse_cor =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
     rm(y_hat_cor)
     rm(imp_test)
-   
     #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
     #imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
     imp_test=complete(mice(test, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred),"all")
     
-    # n1=foreach(i=1:5,.packages = c("rpart","mice"),.combine = "cbind")%dopar%{
-    #   res=predict(modelos[[i]],complete(imp_test,i))
-    #   return(res)}
-      
+    
+    
 
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
@@ -170,14 +163,29 @@ for (n_i in c(0.1,0.2,0.3,0.4)){ #inicializamos con el porcentajo de datos falta
       }
 
     }
-    
+    # 
     y_hat_inc=rowMeans(n1)
     rm(n1)
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$yi)^2) 
+    mse_inc =mean((y_hat_inc-test$yi)^2)
     rm(y_hat_inc)
-    print(paste(avance,"/400"))
-    }}
+    return(list(mse_cor,mse_inc))
+  }
+
+#separar la el resultado unico obtenido en mse_cor y mse_inc
+for (j in 1:4){
+  cont=1
+  for (i in mse[[j]]){
+    mse_cor[cont,j]=i[[1]]
+    mse_inc[cont,j]=i[[2]]
+    cont=cont+1
+  }
+  
+}
+
 parallel::stopCluster(cl = my.cluster)
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
 
 #Guardar en excel
 wb <- createWorkbook()
