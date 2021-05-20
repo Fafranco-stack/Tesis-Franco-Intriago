@@ -4,7 +4,8 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS","randomForest","openxlsx","foreach","doParallel"),type = "both")
+install.packages(c("mice", "MASS", "party","randomForest","openxlsx","foreach","doParallel"), type = "both")
+
 
 library(mice)
 library(MASS)
@@ -12,16 +13,18 @@ library(randomForest)
 library(openxlsx)
 library(foreach)
 library(doParallel)
+library(tidyverse)
 
-n.cores <- parallel::detectCores() - 1
+n.cores <- 4
 my.cluster <- parallel::makeCluster(
-  n.cores, 
+  n.cores,
   type = "PSOCK"
 )
 print(my.cluster)
 doParallel::registerDoParallel(cl = my.cluster)
 foreach::getDoParRegistered()
 foreach::getDoParWorkers()
+
 
 n<-5000 #datos
 mu_y<-0 #media error y
@@ -79,17 +82,13 @@ rm(yi)
 
 #Agregamos los datos faltantes
 #datos faltantes 10%, 20%, 30%, 40%
-n_f=c(0.1,0.2,0.3,0.4)
 
-mse_cor=matrix(ncol = 4,nrow=100) #Media cuadrática del error enfoque correcto
-mse_inc=matrix(ncol = 4,nrow=100) #Media cuadrática del error enfoque incorrecto
-
-contador_mse=n_f[1]*10-1 #Contador
+mse_cor=matrix(ncol=4,nrow = 100)
+mse_inc=matrix(ncol=4,nrow = 100)
 
 start.time <- Sys.time()
-for (n_i in n_f){ #inicializamos con el porcentajo de datos faltantes
-  contador_mse=contador_mse+1
-  for (r in 1:100){
+mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos faltantes
+  foreach(r=c(1:1),.packages=c("mice","randomForest","tidyverse"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
@@ -106,25 +105,32 @@ for (n_i in n_f){ #inicializamos con el porcentajo de datos faltantes
       test[nas,te]=NA #a?adimos los NA al conjunto de prueba
     }
     
-  #********************Imputaci?n de datos faltantes bajo enfoque correcto y evaluaci?n de predicci?n Random Forest
+    #********************Imputaci?n de datos faltantes bajo enfoque correcto y evaluaci?n de predicci?n Random Forest
     datos.ignore=rbind.data.frame(training,test) #union de los datos de prueba y entrenamiento en una variable
-    
     imp <- mice(datos.ignore, ignore =as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos)))),predictorMatrix = pred,m = 5, defaultMethod = c("norm", "logreg", "polyreg")) #con el par?metro ignore seleccionamos los datos que deben ser ignorados pero que deben imputarse
+    
     rm(datos.ignore)
     
     imp_test=complete(filter(imp,as.logical(c(rep(0,ptraining*nrow(datos)),rep(1,ptest*nrow(datos))))),"all")
     imp_entre=complete(filter(imp,as.logical(c(rep(1,ptraining*nrow(datos)),rep(0,ptest*nrow(datos))))),"all")
     rm(imp)
-
-    modelos=foreach(ent=iter(imp_entre),.packages = c("randomForest"))%dopar%{
-      m.i=randomForest::randomForest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,ntree = 500,mtry = min(5, ncol(datos)-1),data= ent)
-      return(m.i)
-    }
     
+    rf=imp_entre %>% lapply(function(x){randomForest(formula=yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=x,ntree = 500,mtry = min(5, ncol(datos)-1))}) #Aplicando rf
+    
+    
+    # cart=foreach(entre=iter(imp_entre),.packages = c("rpart"))%dopar%{
+    #   m.i=rpart::rpart(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,control= rpart.control(maxsurrogate = min(3,ncol(training)-1)),data=entre )
+    #   return(m.i)
+    # }
+    # 
+    # n1=foreach(modelo=iter(cart),test=iter(imp_test),.packages = c("rpart"),.combine = "cbind")%dopar%{
+    #   res=predict(modelo,test)
+    #   return(res)
+    # }
     rm(imp_entre)
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=modelos[[i]]
+      modelo=rf[[i]]
       contador=0
       rf.res=predict(modelo,imp_test[[i]])
       for (j in rf.res){
@@ -133,21 +139,22 @@ for (n_i in n_f){ #inicializamos con el porcentajo de datos faltantes
       }
       
     }
- 
-    
-    
     y_hat_cor=rowMeans(n1) #Variable y medias enfoque correcto
     rm(n1)
-    mse_cor[r,contador_mse] =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
+    mse_cor =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
     rm(y_hat_cor)
-  #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
+    rm(imp_test)
+    #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
     #imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
     imp_test=complete(mice(test, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred),"all")
     
+    
+    
+    
     n1=matrix(ncol = 5,nrow=1000)
     for (i in 1:5){
-      modelo=modelos[[i]]
+      modelo=rf[[i]]
       contador=0
       rf.res=predict(modelo,imp_test[[i]])
       for (j in rf.res){
@@ -156,39 +163,42 @@ for (n_i in n_f){ #inicializamos con el porcentajo de datos faltantes
       }
       
     }
-    rm(imp_test)
+    # 
     y_hat_inc=rowMeans(n1)
     rm(n1)
-    mse_inc[r,contador_mse] =mean((y_hat_inc-test$yi)^2) 
-    rm(y_hat_inc) 
-    }}
-   
-parallel::stopCluster(cl = my.cluster)
+    mse_inc =mean((y_hat_inc-test$yi)^2)
+    rm(y_hat_inc)
+    return(list(mse_cor,mse_inc))
+  }
 
-#Guardar datos en excel
-
-if (length(n_f)<4){
-  wb <- createWorkbook()
-  addWorksheet(wb, "Enfoque Correcto")
-  addWorksheet(wb, "Enfoque Incorrecto")
+#separar la el resultado unico obtenido en mse_cor y mse_inc
+for (j in 1:4){
+  cont=1
+  for (i in mse[[j]]){
+    mse_cor[cont,j]=i[[1]]
+    mse_inc[cont,j]=i[[2]]
+    cont=cont+1
+  }
   
-  writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
-  writeData(wb, "Enfoque Incorrecto", mse_inc, startRow = 1, startCol = 1)
-  saveWorkbook(wb, file = paste(paste(n_f,collapse = "-"),"RF-MICE.xlsx",sep="-"), overwrite = TRUE)
-}  else {
-  wb <- createWorkbook()
-  addWorksheet(wb, "Enfoque Correcto")
-  addWorksheet(wb, "Enfoque Incorrecto")
-  writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
-  writeData(wb, "Enfoque Incorrecto", mse_inc, startRow = 1, startCol = 1)
-  saveWorkbook(wb, file = "RF-MICE.xlsx", overwrite = TRUE)}
+}
 
+parallel::stopCluster(cl = my.cluster)
 end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
 
+#Guardar en excel
+wb <- createWorkbook()
+addWorksheet(wb, "Enfoque Correcto")
+addWorksheet(wb, "Enfoque Incorrecto")
 
+writeData(wb, "Enfoque Correcto", mse_cor, startRow = 1, startCol = 1)
+writeData(wb, "Enfoque Incorrecto", mse_inc, startRow = 1, startCol = 1)
 
+saveWorkbook(wb, file = "RF-MICE.xlsx", overwrite = TRUE)
 
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
 
 
