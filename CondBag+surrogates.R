@@ -13,7 +13,7 @@ library(openxlsx)
 library(doParallel)
 library(foreach)
 
-n.cores <- parallel::detectCores() - 1
+n.cores <- 4
 my.cluster <- parallel::makeCluster(
   n.cores,
   type = "PSOCK"
@@ -81,10 +81,8 @@ rm(yi)
 #Agregamos los datos faltantes
 #datos faltantes 10%, 20%, 30%, 40%
 
-contador_mse=0 #Contador
-vec=rep(0,100)
 start.time <- Sys.time()
-mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:%  #inicializamos con el porcentajo de datos faltantes
+mse=foreach(n_i=c(0.1,0.2,0.3,0.4),.combine="cbind")%:%  #inicializamos con el porcentajo de datos faltantes
   
   foreach (r= 1:1,.packages = c("party"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
@@ -106,16 +104,16 @@ mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:%  #inicializamos con el porcentajo de dato
     
     crforest=cforest(yi~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10,data=training,controls = cforest_unbiased(ntree = 500, mtry = (ncol(datos)-1), maxsurrogate = min(3, ncol(test)-1)))
     crforest.res=predict(crforest,newdata=test)
-    mse =mean((crforest.res-test$yi)^2)
-    vec[r]=mse
-     
-  return(vec)
+    mse_cor =mean((crforest.res-test$yi)^2)
+    return(mse_cor)
   } #media cuadr?tica del error
 
 
-#Guardar datos en excel
+
+mse=apply(mse,2, FUN=as.numeric)
 parallel::stopCluster(cl = my.cluster)
 
+#Guardar datos en excel
 wb <- createWorkbook()
 addWorksheet(wb, "Enfoque Correcto")
 
