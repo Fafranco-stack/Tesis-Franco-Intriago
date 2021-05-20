@@ -141,6 +141,8 @@ mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos
     mse_cor =mean((y_hat_cor-test$yi)^2) #media cuadr?tica del error
     rm(y_hat_cor)
     rm(imp_test)
+    rm(modelo)
+    
     #********************Imputaci?n de datos faltantes bajo enfoque incorrecto y evaluaci?n de predicci?n************************************************
     
     #imp_entre <- mice(training, m = 5, defaultMethod = c("norm", "logreg", "polyreg"),predictorMatrix = pred)
@@ -166,6 +168,8 @@ mse=foreach(n_i=c(0.1,0.2,0.3,0.4))%:% #inicializamos con el porcentajo de datos
     mse_inc =mean((y_hat_inc-test$yi)^2)
     rm(y_hat_inc)
     rm(crf)
+    rm(modelo)
+    
     return(list(mse_cor,mse_inc))
   }
 
