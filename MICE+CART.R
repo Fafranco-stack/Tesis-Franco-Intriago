@@ -4,7 +4,7 @@
 
 # *********************Simulaci?n de datos*******************************
 options(install.packages.compile.from.source = "always")
-install.packages(c("mice", "MASS", "party","rpart","openxlsx","foreach","doParallel"), type = "both")
+install.packages(c("mice", "MASS", "party","rpart","openxlsx","foreach","doParallel","tidyverse"), type = "both")
 
 
 library(mice)

@@ -84,7 +84,7 @@ rm(yi)
 start.time <- Sys.time()
 mse=foreach(n_i=c(0.1,0.2,0.3,0.4),.combine="cbind")%:%  #inicializamos con el porcentajo de datos faltantes
   
-  foreach (r= 1:1,.packages = c("party"))%dopar%{
+  foreach (r= 1:100,.packages = c("party"))%dopar%{
     training_sample<-sample(1:nrow(datos),ptraining*nrow(datos))
     
     training=datos[training_sample,] #variable training con los datos de entrenamiento
